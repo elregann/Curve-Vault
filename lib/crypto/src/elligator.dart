@@ -1,6 +1,7 @@
 // elligator.dart
 
 import 'field.dart';
+import 'montgomery.dart';
 import 'params.dart';
 
 class Elligator {
@@ -20,32 +21,39 @@ class Elligator {
     final t2 = FieldElement.mul(t, t);
     final denom = FieldElement.add(BigInt.one, FieldElement.mul(u, t2));
 
-    final x1 = FieldElement.mul(
+    var x1 = FieldElement.mul(
       FieldElement.sub(BigInt.zero, A),
       FieldElement.inv0(denom),
     );
+    // RFC 9380 section 6.7.1: when 1 + u*t² == 0, x1 is defined as -A
+    if (x1 == BigInt.zero) x1 = FieldElement.sub(BigInt.zero, A);
     // x2 = -x1 - A
     final x2 = FieldElement.sub(FieldElement.sub(BigInt.zero, x1), A);
 
     // Select x which lies on curve: y² = x³ + Ax² + x
-    final rhs1 = _curveRhs(x1);
+    final rhs1 = Montgomery.curveRhs(x1);
     final exp = (p + BigInt.one) >> 2;
-    final y1 = rhs1.modPow(exp, p);
+    final y1 = FieldElement.pow(rhs1, exp);
     if (FieldElement.mul(y1, y1) == rhs1) return x1;
     return x2;
   }
 
   static BigInt? decode(BigInt x) {
-    // t² = -(x + A) / (u * x)
-    final num = FieldElement.sub(BigInt.zero, FieldElement.add(x, A));
-    final den = FieldElement.mul(u, x);
-    if (den == BigInt.zero) return null;
+    final BigInt t2;
+    if (x == FieldElement.sub(BigInt.zero, A)) {
+      // Exceptional point reached from 1 + u*t² == 0, so t² = -1 / u
+      t2 = FieldElement.sub(BigInt.zero, FieldElement.inv(u));
+    } else {
+      // t² = -(x + A) / (u * x)
+      final num = FieldElement.sub(BigInt.zero, FieldElement.add(x, A));
+      final den = FieldElement.mul(u, x);
+      if (den == BigInt.zero) return null;
+      t2 = FieldElement.mul(num, FieldElement.inv(den));
+    }
 
-    final t2 = FieldElement.mul(num, FieldElement.inv(den));
-
-    // Square root: t = t²^((p+1)/4) — use safe impl due to Dart modPow bug
+    // Square root: t = t²^((p+1)/4)
     final exp = (p + BigInt.one) >> 2;
-    final t = _modPowSafe(t2, exp, p);
+    final t = FieldElement.pow(t2, exp);
 
     // Verify t is valid square root
     if (FieldElement.mul(t, t) != t2) return null;
@@ -54,28 +62,5 @@ class Elligator {
     final tNeg = FieldElement.sub(BigInt.zero, t);
     final half = p >> 1;
     return t <= half ? t : tNeg;
-  }
-
-  // Safe modular exponentiation — replaces Dart BigInt.modPow
-  // due to precision issues with 256-bit numbers
-  static BigInt _modPowSafe(BigInt base, BigInt exp, BigInt mod) {
-    BigInt result = BigInt.one;
-    base = base % mod;
-    while (exp > BigInt.zero) {
-      if (exp.isOdd) result = (result * base) % mod;
-      exp = exp >> 1;
-      base = (base * base) % mod;
-    }
-    return result;
-  }
-
-  // Montgomery curve RHS: x³ + Ax² + x
-  static BigInt _curveRhs(BigInt x) {
-    final x2 = FieldElement.mul(x, x);
-    final x3 = FieldElement.mul(x, x2);
-    return FieldElement.add(
-      FieldElement.add(x3, FieldElement.mul(A, x2)),
-      x,
-    );
   }
 }

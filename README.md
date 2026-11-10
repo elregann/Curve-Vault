@@ -56,7 +56,7 @@ CurveVault is built around **Curve256189**, a custom curve designed by the same 
 | --- | --- |
 | Field prime | `p = 2^256 − 189` |
 | Curve form (Montgomery) | `y² = x³ + Ax² + x` |
-| Curve coefficient | `A = 479597` |
+| Curve coefficient | `A = 61370` |
 | Cofactor | `h = 4` |
 | Prime-order subgroup | `n` |
 | Public key size | 32 bytes |
@@ -67,8 +67,9 @@ Implemented primitives in `lib/crypto/src`:
 
 | Module | Purpose |
 | --- | --- |
-| `x256189.dart` | X256189 ECDH with cofactor-cleared, RFC 7748-style little-endian keys |
-| `xeddsa.dart` | XEdDSA signatures with canonical even-y representatives |
+| `x256189.dart` | X256189 ECDH with cofactor-cleared, RFC 7748-style little-endian keys (not wire-compatible with X25519) |
+| `xeddsa.dart` | XEdDSA signatures with canonical even-y representatives (used by the app) |
+| `eddsa256189.dart` | Ed256189 EdDSA over the dual Edwards curve (bundled with the library, not used by the app) |
 | `elligator.dart` | Elligator 2 encoding/decoding for uniform-looking curve points |
 | `batch_verify.dart` | Randomized batch verification of XEdDSA signatures |
 | `field.dart`, `montgomery.dart`, `edwards.dart` | Field and curve arithmetic |
